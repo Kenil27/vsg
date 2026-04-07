@@ -1,6 +1,6 @@
 export const VIHAR_LOCATIONS = [
-  "Goregaon",
-  "Malad",
+  "goregaon",
+  "malad",
   "Kandivali",
   "Jogeshwari",
   "Andheri",
