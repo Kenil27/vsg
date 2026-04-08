@@ -11,7 +11,7 @@ export function SiteHeader() {
           href="/"
           className="text-base font-semibold tracking-tight text-emerald-800 dark:text-emerald-400"
         >
-          Vihar
+          VSG - Goregaon
         </Link>
         <nav className="flex items-center gap-1">
           <Link href="/" className={linkClass}>

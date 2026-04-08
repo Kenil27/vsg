@@ -35,12 +35,11 @@ export function LoginCard({ auth }: LoginCardProps) {
   };
 
   return (
-    <Card title="Admin sign in">
+    <Card>
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <Field
           id="admin-email"
           label="Email"
-          hint="Firebase Auth uses an email address as the account id."
         >
           <Input
             id="admin-email"

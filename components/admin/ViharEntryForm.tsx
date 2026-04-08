@@ -14,22 +14,36 @@ import {
   type SevakOption,
   fetchSevakOptions,
 } from "@/lib/firestore/sevak";
+import { buildViharWhatsappMessage } from "@/lib/whatsapp/buildViharWhatsappMessage";
+import { toWhatsAppE164 } from "@/lib/whatsapp/extractPhone";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { SevakMultiPicker } from "@/components/admin/SevakMultiPicker";
+import { ViharWhatsappPanel } from "@/components/admin/ViharWhatsappPanel";
 
 type ViharEntryFormProps = {
   db: Firestore;
   auth: Auth;
+  /** Increment to refetch sevak names from Firestore (e.g. after admin editor saves). */
+  sevakRefreshToken?: number;
 };
 
 function isoDateToSlash(iso: string): string {
   const [y, m, d] = iso.split("-");
   if (!y || !m || !d) return iso;
   return `${y}/${m}/${d}`;
+}
+
+function isoToDmy(iso: string): string {
+  const [ys, ms, ds] = iso.split("-");
+  const y = Number(ys);
+  const m = Number(ms);
+  const d = Number(ds);
+  if (!y || !m || !d) return iso;
+  return `${d}/${m}/${y}`;
 }
 
 const genderOptions = [
@@ -44,7 +58,7 @@ const timeOptions = [
 
 const locationSelectOptions = VIHAR_LOCATIONS.map((loc) => ({
   value: loc,
-  label: loc,
+  label: loc.charAt(0).toUpperCase() + loc.slice(1).toLowerCase(),
 }));
 
 const updhiOptions = [
@@ -52,7 +66,16 @@ const updhiOptions = [
   { value: "yes", label: "Yes" },
 ] as const;
 
-export function ViharEntryForm({ db, auth }: ViharEntryFormProps) {
+const wheelchairOptions = [
+  { value: "no", label: "No" },
+  { value: "yes", label: "Yes" },
+] as const;
+
+export function ViharEntryForm({
+  db,
+  auth,
+  sevakRefreshToken = 0,
+}: ViharEntryFormProps) {
   const [sevakList, setSevakList] = useState<SevakOption[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [dateIso, setDateIso] = useState("");
@@ -64,12 +87,20 @@ export function ViharEntryForm({ db, auth }: ViharEntryFormProps) {
   const [viharSainiks, setViharSainiks] = useState<string[]>([]);
   const [updhi, setUpdhi] = useState<"yes" | "no">("no");
   const [updhiSevakName, setUpdhiSevakName] = useState("");
+  const [mahatmaName, setMahatmaName] = useState("");
+  const [viharStartTime, setViharStartTime] = useState("");
+  const [thana, setThana] = useState("");
+  const [initialViharStart, setInitialViharStart] = useState("");
+  const [finalViharEnd, setFinalViharEnd] = useState("");
+  const [wheelchair, setWheelchair] = useState<"yes" | "no">("no");
+  const [wheelchairCount, setWheelchairCount] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    setLoadError(null);
     (async () => {
       try {
         const rows = await fetchSevakOptions(db);
@@ -83,12 +114,81 @@ export function ViharEntryForm({ db, auth }: ViharEntryFormProps) {
     return () => {
       cancelled = true;
     };
-  }, [db]);
+  }, [db, sevakRefreshToken]);
 
   const sevakNameOptions = useMemo(
     () => sevakList.map((o) => ({ value: o.name, label: o.name })),
     [sevakList],
   );
+
+  const whatsappMessage = useMemo(() => {
+    if (!dateIso) return "";
+    const thanaNum = Number(thana);
+    if (Number.isNaN(thanaNum) || thanaNum < 0) return "";
+    if (
+      !mahatmaName.trim() ||
+      !viharStartTime.trim() ||
+      !viharStart ||
+      !viharEnd ||
+      !initialViharStart ||
+      !finalViharEnd
+    ) {
+      return "";
+    }
+    const wc =
+      wheelchair === "yes" ? Math.max(0, Number(wheelchairCount) || 0) : 0;
+    return buildViharWhatsappMessage({
+      dateDmy: isoToDmy(dateIso),
+      thana: thanaNum,
+      mahatmaName: mahatmaName.trim(),
+      viharStartTime: viharStartTime.trim(),
+      viharStartLocation: viharStart,
+      viharEndLocation: viharEnd,
+      initialViharStart,
+      finalViharEnd,
+      viharSainikLines: viharSainiks,
+      updhiLine:
+        updhi === "yes" && updhiSevakName.trim()
+          ? updhiSevakName.trim()
+          : null,
+      wheelchairYes: wheelchair === "yes",
+      wheelchairCount: wc,
+    });
+  }, [
+    dateIso,
+    thana,
+    mahatmaName,
+    viharStartTime,
+    viharStart,
+    viharEnd,
+    initialViharStart,
+    finalViharEnd,
+    viharSainiks,
+    updhi,
+    updhiSevakName,
+    wheelchair,
+    wheelchairCount,
+  ]);
+
+  const waTargets = useMemo(() => {
+    const out: { label: string; wa: string }[] = [];
+    const seen = new Set<string>();
+    const push = (label: string, raw: string) => {
+      const wa = toWhatsAppE164(raw);
+      if (!wa || seen.has(wa)) return;
+      seen.add(wa);
+      out.push({ label, wa });
+    };
+    for (const line of viharSainiks) {
+      const t = line.trim();
+      if (t) push(t, t);
+    }
+    if (updhi === "yes" && updhiSevakName.trim()) {
+      const t = updhiSevakName.trim();
+      push(`Updhi · ${t}`, t);
+    }
+    return out;
+  }, [viharSainiks, updhi, updhiSevakName]);
 
   const resetForm = () => {
     setDateIso("");
@@ -100,6 +200,13 @@ export function ViharEntryForm({ db, auth }: ViharEntryFormProps) {
     setViharSainiks([]);
     setUpdhi("no");
     setUpdhiSevakName("");
+    setMahatmaName("");
+    setViharStartTime("");
+    setThana("");
+    setInitialViharStart("");
+    setFinalViharEnd("");
+    setWheelchair("no");
+    setWheelchairCount("");
   };
 
   const onSubmit = async (e: FormEvent) => {
@@ -128,12 +235,39 @@ export function ViharEntryForm({ db, auth }: ViharEntryFormProps) {
       setFormError("Select sevak name for Updhi.");
       return;
     }
+    if (!mahatmaName.trim()) {
+      setFormError("Enter Mahatma name.");
+      return;
+    }
+    if (!viharStartTime.trim()) {
+      setFormError("Enter Vihar start time.");
+      return;
+    }
+    const thanaNum = Number(thana);
+    if (Number.isNaN(thanaNum) || thanaNum < 0) {
+      setFormError("Enter a valid Thana (0 or greater).");
+      return;
+    }
+    if (!initialViharStart || !finalViharEnd) {
+      setFormError("Choose Initial Vihar Start and Final Vihar End.");
+      return;
+    }
+    if (wheelchair === "yes") {
+      const wc = Number(wheelchairCount);
+      if (Number.isNaN(wc) || wc < 1) {
+        setFormError("Enter wheelchair count (at least 1).");
+        return;
+      }
+    }
 
     const user = auth.currentUser;
     if (!user) {
       setFormError("You are not signed in.");
       return;
     }
+
+    const wcNum =
+      wheelchair === "yes" ? Math.max(1, Number(wheelchairCount) || 0) : null;
 
     setSubmitting(true);
     try {
@@ -147,6 +281,13 @@ export function ViharEntryForm({ db, auth }: ViharEntryFormProps) {
         viharSainiks,
         updhi: updhi === "yes",
         updhiSevakName: updhi === "yes" ? updhiSevakName : null,
+        mahatmaName: mahatmaName.trim(),
+        viharStartTime: viharStartTime.trim(),
+        thana: thanaNum,
+        initialViharStart,
+        finalViharEnd,
+        wheelchair: wheelchair === "yes",
+        wheelchairCount: wcNum,
         createdAt: serverTimestamp(),
         createdByUid: user.uid,
       });
@@ -254,6 +395,89 @@ export function ViharEntryForm({ db, auth }: ViharEntryFormProps) {
             />
           </Field>
         ) : null}
+
+        <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-4 dark:border-zinc-700 dark:bg-zinc-900/40">
+          <h3 className="mb-3 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            WhatsApp message fields
+          </h3>
+          <div className="flex flex-col gap-4">
+            <Field id="entry-mahatma" label="Mahatma name">
+              <Input
+                id="entry-mahatma"
+                value={mahatmaName}
+                onChange={(e) => setMahatmaName(e.target.value)}
+                placeholder="e.g. Pu.Munishratna suri ma.sa"
+                required
+              />
+            </Field>
+            <Field
+              id="entry-vihar-clock"
+              label="Vihar start time"
+              hint="Shown in the message as typed (e.g. 5.30am)."
+            >
+              <Input
+                id="entry-vihar-clock"
+                value={viharStartTime}
+                onChange={(e) => setViharStartTime(e.target.value)}
+                placeholder="e.g. 5.30am"
+                required
+              />
+            </Field>
+            <Field id="entry-thana" label="Thana">
+              <Input
+                id="entry-thana"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                step={1}
+                value={thana}
+                onChange={(e) => setThana(e.target.value)}
+                required
+              />
+            </Field>
+            <Field id="entry-initial" label="Initial Vihar start">
+              <Select
+                id="entry-initial"
+                required
+                value={initialViharStart}
+                onChange={(e) => setInitialViharStart(e.target.value)}
+                options={locationSelectOptions}
+              />
+            </Field>
+            <Field id="entry-final" label="Final Vihar end">
+              <Select
+                id="entry-final"
+                required
+                value={finalViharEnd}
+                onChange={(e) => setFinalViharEnd(e.target.value)}
+                options={locationSelectOptions}
+              />
+            </Field>
+            <Field id="entry-wheelchair" label="Wheelchair">
+              <Select
+                id="entry-wheelchair"
+                value={wheelchair}
+                onChange={(e) => setWheelchair(e.target.value as "yes" | "no")}
+                options={[...wheelchairOptions]}
+              />
+            </Field>
+            {wheelchair === "yes" ? (
+              <Field id="entry-wheelchair-n" label="Wheelchair count">
+                <Input
+                  id="entry-wheelchair-n"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  step={1}
+                  value={wheelchairCount}
+                  onChange={(e) => setWheelchairCount(e.target.value)}
+                  required
+                />
+              </Field>
+            ) : null}
+          </div>
+        </div>
+
         {formError ? (
           <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800 dark:bg-red-950/40 dark:text-red-200">
             {formError}
@@ -268,6 +492,10 @@ export function ViharEntryForm({ db, auth }: ViharEntryFormProps) {
           {submitting ? "Saving…" : "Submit"}
         </Button>
       </form>
+
+      <div className="mt-6">
+        <ViharWhatsappPanel message={whatsappMessage} targets={waTargets} />
+      </div>
     </Card>
   );
 }

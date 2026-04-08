@@ -2,15 +2,22 @@
 
 import { signOut } from "firebase/auth";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useClientFirebase } from "@/lib/hooks/useClientFirebase";
 import { LoginCard } from "@/components/admin/LoginCard";
+import { SevakNamesEditor } from "@/components/admin/SevakNamesEditor";
 import { ViharEntryForm } from "@/components/admin/ViharEntryForm";
 import { Button } from "@/components/ui/Button";
 
 export function AdminScreen() {
   const fb = useClientFirebase();
   const [user, setUser] = useState<User | null | undefined>(undefined);
+  const [sevakRefreshToken, setSevakRefreshToken] = useState(0);
+  const [sevakEditorOpen, setSevakEditorOpen] = useState(false);
+
+  const bumpSevakRefresh = useCallback(() => {
+    setSevakRefreshToken((n) => n + 1);
+  }, []);
 
   useEffect(() => {
     if (!fb) return;
@@ -55,7 +62,27 @@ export function AdminScreen() {
           Sign out
         </Button>
       </div>
-      <ViharEntryForm db={fb.db} auth={fb.auth} />
+      {sevakEditorOpen ? (
+        <SevakNamesEditor
+          db={fb.db}
+          onSaved={bumpSevakRefresh}
+          onClose={() => setSevakEditorOpen(false)}
+        />
+      ) : (
+        <Button
+          type="button"
+          variant="secondary"
+          className="self-start"
+          onClick={() => setSevakEditorOpen(true)}
+        >
+          Add / Edit / Delete sevak names
+        </Button>
+      )}
+      <ViharEntryForm
+        db={fb.db}
+        auth={fb.auth}
+        sevakRefreshToken={sevakRefreshToken}
+      />
     </div>
   );
 }
