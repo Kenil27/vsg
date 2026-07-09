@@ -15,10 +15,14 @@ export function clamp(value: number, min: number, max: number): number {
  * 
  * @param start - The starting value.
  * @param end - The ending value.
- * @param amount - The interpolation amount (usually between 0 and 1).
+ * @param amount - The interpolation amount (must be between 0 and 1).
  * @returns The interpolated value.
+ * @throws {RangeError} If amount is not between 0 and 1.
  */
 export function lerp(start: number, end: number, amount: number): number {
+  if (amount < 0 || amount > 1) {
+    throw new RangeError("The lerp amount parameter must be between 0 and 1.");
+  }
   return start + (end - start) * amount;
 }
 
