@@ -3,11 +3,16 @@
  * "kehul bhai 9820241010" or "Keyul9594121207".
  */
 export function extractIndianMobileDigits(raw: string): string | null {
-  const digitsOnly = raw.replace(/\D/g, "");
-  if (digitsOnly.length < 10) return null;
-  const last10 = digitsOnly.slice(-10);
-  if (!/^[6-9]\d{9}$/.test(last10)) return null;
-  return last10;
+  const regex = /(?:\+91[\s-]?|91[\s-]?)?([6-9]\d{9})(?!\d)/g;
+
+  let match: RegExpExecArray | null;
+  let last: string | null = null;
+
+  while ((match = regex.exec(raw)) !== null) {
+    last = match[1];
+  }
+
+  return last;
 }
 
 /** `91` + 10 digits for wa.me */
