@@ -12,7 +12,7 @@ export function extractIndianMobileDigits(raw: string): string | null {
     last = match[1];
   }
 
-  return last;
+  return last ? last : null;
 }
 
 /** `91` + 10 digits for wa.me */
