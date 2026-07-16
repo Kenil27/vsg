@@ -18,5 +18,5 @@ export function extractIndianMobileDigits(raw: string): string | null {
 /** `91` + 10 digits for wa.me */
 export function toWhatsAppE164(raw: string): string | null {
   const ten = extractIndianMobileDigits(raw);
-  return ten ? `91${ten}` : null;
+  return ten;
 }
