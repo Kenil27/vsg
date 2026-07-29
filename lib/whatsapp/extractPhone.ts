@@ -10,8 +10,9 @@ export function extractIndianMobileDigits(raw: string): string | null {
   return last10;
 }
 
-/** `91` + 10 digits for wa.me */
+/** `91` + 10 digits for wa.me, e.g. "919820241010" */
 export function toWhatsAppE164(raw: string): string | null {
-  return extractIndianMobileDigits(raw);
-  
+  const digits = extractIndianMobileDigits(raw);
+  if (!digits) return null;
+  return `91${digits}`;
 }
