@@ -253,7 +253,7 @@ export function ViharEntryForm({
     }
 
     const wcNum =
-      wheelchair === "yes" ? Math.max(1, Number(wheelchairCount) || 0) : null;
+      wheelchair === "yes" ? Math.max(1, Number(wheelchairCount) || 0) : 0;
 
     setSubmitting(true);
     try {
