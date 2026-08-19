@@ -32,7 +32,7 @@ type ViharEntryFormProps = {
 };
 
 function isoDateToSlash(iso: string): string {
-  const [y, m, d] = iso.split("-");
+  const [y, m, d] = iso.split("/");
   if (!y || !m || !d) return iso;
   return `${y}/${m}/${d}`;
 }
@@ -164,10 +164,6 @@ export function ViharEntryForm({
     initialViharStart,
     finalViharEnd,
     viharSainiks,
-    updhi,
-    updhiSevakName,
-    wheelchair,
-    wheelchairCount,
   ]);
 
   const waTargets = useMemo(() => {
@@ -192,12 +188,10 @@ export function ViharEntryForm({
 
   const resetForm = () => {
     setDateIso("");
-    setGender("");
     setTimeOfDay("");
     setViharStart("");
     setViharEnd("");
     setKms("");
-    setViharSainiks([]);
     setUpdhi("no");
     setUpdhiSevakName("");
     setMahatmaName("");
@@ -252,14 +246,6 @@ export function ViharEntryForm({
       setFormError("Choose Initial Vihar Start and Final Vihar End.");
       return;
     }
-    if (wheelchair === "yes") {
-      const wc = Number(wheelchairCount);
-      if (Number.isNaN(wc) || wc < 1) {
-        setFormError("Enter wheelchair count (at least 1).");
-        return;
-      }
-    }
-
     const user = auth.currentUser;
     if (!user) {
       setFormError("You are not signed in.");
