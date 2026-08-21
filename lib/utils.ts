@@ -5,7 +5,7 @@
  * truncate("Hello World", 8) // "Hello..."
  * truncate("Hi", 5)          // "Hi"
  */
-export function truncate(str: string, maxLength: number, suffix = "..."): string {
+export function truncate(str: string, maxLength: number): string {
   if (str.length <= maxLength) return str;
-  return str.slice(0, maxLength) + suffix;
+  return str.slice(0, maxLength) + '...';
 }
